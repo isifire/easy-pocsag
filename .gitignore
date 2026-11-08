@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.iq
+build/
+dist/
+*.spec
+
+# Machine-specific WSL launchers and local reference captures
+/launch-wsl.sh
+/Abrir POCSAG.cmd
+/WSL-LOCAL.md
+/diagnostics/

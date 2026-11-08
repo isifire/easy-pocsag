@@ -1,7 +1,7 @@
 # 📡 POCSAG Sender + HackRF One
 
 Herramienta completa para enviar mensajes POCSAG a un bíper (busca) usando
-**GNU Radio** y un **HackRF One** como transmisor SDR.
+**Python/NumPy** y un **HackRF One** como transmisor SDR, sin GNU Radio ni OsmoSDR.
 
 Incluye CLI potente e interfaz gráfica profesional con tema oscuro, historial de mensajes,
 perfiles guardables, soporte para mensajes alfanuméricos, numéricos y tone-only.
@@ -34,10 +34,9 @@ perfiles guardables, soporte para mensajes alfanuméricos, numéricos y tone-onl
 - Antena para la frecuencia objetivo
 
 ### Software
-- GNU Radio 3.10+
 - Python 3.10+
-- Paquetes Python: `numpy`, `bitstring`, `PyQt6`
-- OsmoSDR (`gr-osmosdr`)
+- Paquetes Python: `numpy`, `PyQt6`
+- Herramientas HackRF (`hackrf_transfer` y `hackrf_info`)
 
 ---
 
@@ -46,15 +45,13 @@ perfiles guardables, soporte para mensajes alfanuméricos, numéricos y tone-onl
 ### Debian / Ubuntu
 
 ```sh
-sudo apt update && sudo apt install -y gnuradio gr-osmosdr python3-pip libxcb-cursor0
-pip3 install numpy bitstring PyQt6
+sudo apt update && sudo apt install -y hackrf python3-numpy python3-pyqt6 libxcb-cursor0
 ```
 
 ### Arch Linux
 
 ```sh
-sudo pacman -S gnuradio gr-osmosdr python-pip xcb-util-cursor
-pip install numpy bitstring PyQt6
+sudo pacman -S hackrf python-numpy python-pyqt6 xcb-util-cursor
 ```
 
 ### Verificar HackRF
@@ -180,3 +177,34 @@ Los datos de usuario se guardan en `~/.pocsag_sender/`:
 ## Licencia
 
 GPL v3 — ver [LICENSE](LICENSE)
+
+## Motor independiente
+
+`pocsag_generator.py` construye las tramas con Python estándar. `native_tx.py`
+genera I/Q int8 mediante FSK de fase continua, a 12 MS/s y desviación de ±4,5 kHz,
+y entrega un archivo temporal a `hackrf_transfer`. El archivo se elimina al terminar.
+No se requieren GNU Radio, OsmoSDR ni bitstring. El flujo `.grc` se conserva como referencia histórica.
+
+`--if-gain` controla TX VGA (0–47 dB). `--tx-gain` activa el amplificador RF.
+`--bb-gain` se acepta por compatibilidad y se ignora: no es una ganancia de TX.
+Recepción del motor independiente confirmada con el busca de prueba a 2400 bps. La polaridad FSK se ha contrastado con la señal del motor original (bit 1: desviación negativa). Los modos numérico y tone-only y los otros bitrates aún necesitan validación física.
+
+Pruebas sin transmisión: `python3 -m unittest -v test_native_tx`.
+
+## Portable v2.1
+
+En Windows, extrae el ZIP completo y abre **POCSAG-Sender.exe**, con el icono de busca verde.
+La aplicación se abre sin consola; no se necesita VBS. Conserva `_internal` junto al ejecutable.
+
+La interfaz muestra los mensajes de transmisión en su registro integrado.
+El auxiliar CLI vive en `_internal/worker/POCSAG-CLI` y no hace falta abrirlo para usar la interfaz.
+
+### GitHub Actions
+
+El workflow **Build portable applications** se ejecuta al subir cambios a main o master, al crear una etiqueta v* o manualmente desde Actions.
+Genera paquetes para Windows x64, Linux x64 y macOS Intel/Apple Silicon,
+comprueba las pruebas de señal, la CLI congelada, Qt y las herramientas HackRF incluidas.
+Los ZIP aparecen como artefactos del workflow. Una etiqueta `v*` también prepara una
+Release en borrador con los ZIP; la validación de radio de cada plataforma se hace con hardware real.
+
+Compilación local: `python scripts/build_portable.py`. Consulta [PORTABLE.md](PORTABLE.md).

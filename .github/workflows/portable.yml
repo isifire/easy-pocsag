@@ -1,0 +1,67 @@
+name: Build portable applications
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: portable
+          create-args: >-
+            python=3.12 numpy pyqt6 pyinstaller hackrf -c conda-forge
+          init-shell: bash
+          cache-environment: true
+      - run: python -m unittest -v test_native_tx
+      - run: python scripts/build_portable.py
+      - name: Check frozen CLI
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            dist/windows/POCSAG-Sender/_internal/worker/POCSAG-CLI/POCSAG-CLI.exe --help
+          else
+            dist/$(python -c "import platform; print(platform.system().lower())")/POCSAG-Sender/_internal/worker/POCSAG-CLI/POCSAG-CLI --help
+          fi
+      - name: Check bundled tools and Qt
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            dist/windows/POCSAG-Sender/_internal/worker/POCSAG-CLI/POCSAG-CLI.exe --self-test
+          else
+            dist/$(python -c "import platform; print(platform.system().lower())")/POCSAG-Sender/_internal/worker/POCSAG-CLI/POCSAG-CLI --self-test
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portable-${{ matrix.os }}
+          path: dist/POCSAG-Sender-*.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: portable-*
+          merge-multiple: true
+          path: packages
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: packages/*.zip

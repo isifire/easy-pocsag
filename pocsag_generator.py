@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-pocsag_generator.py — Bloque GNU Radio para generación de señales POCSAG.
+pocsag_generator.py — Generación independiente de tramas POCSAG.
 
 Implementa el estándar POCSAG (Post Office Code Standardisation Advisory Group)
 con soporte para mensajes alfanuméricos, numéricos y tone-only.
@@ -14,9 +14,6 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-import numpy as np
-from bitstring import BitArray
-from gnuradio import gr
 
 logger = logging.getLogger(__name__)
 
@@ -44,21 +41,8 @@ MsgMode = Literal["alpha", "numeric", "tone"]
 # ---------------------------------------------------------------------------
 # Bloque GNU Radio
 # ---------------------------------------------------------------------------
-class PocsagSender(gr.sync_block):
-    """
-    Bloque fuente GNU Radio que emite una trama POCSAG completa.
-
-    El bloque produce exactamente ``msglen`` muestras (de tipo int8) y luego
-    devuelve -1 para señalar el fin del flujo, lo que hace que GNU Radio
-    detenga el grafo automáticamente.
-
-    Args:
-        number:    Número RIC del receptor (1 – 2 097 151).
-        source:    SubRIC / fuente (0 – 3).
-        sleeptime: Reservado (no usado, por compatibilidad).
-        text:      Mensaje a transmitir.
-        mode:      "alpha" (alfanumérico), "numeric" (solo dígitos) o "tone".
-    """
+class PocsagSender:
+    """Genera símbolos POCSAG (-1/+1), sin dependencias de radio."""
 
     def __init__(
         self,
@@ -68,13 +52,6 @@ class PocsagSender(gr.sync_block):
         text: str = "ON1ARF pocsag Python gnuradio",
         mode: MsgMode = "alpha",
     ):
-        gr.sync_block.__init__(
-            self,
-            name="pocsag generator",
-            in_sig=[],
-            out_sig=[np.int8],
-        )
-
         self.sleeptime = sleeptime
         self.number    = int(number)
         self.source    = int(source)
@@ -95,30 +72,12 @@ class PocsagSender(gr.sync_block):
         for word in psmsg:
             samples.extend(
                 1 if bit == "1" else -1
-                for bit in BitArray(uint=word, length=32).bin
+                for bit in format(word, "032b")
             )
 
         samples.extend([0] * silence_samples)
         self.pocsagmsg = samples
         self.msglen    = len(samples)
-
-        # output_multiple = msglen garantiza que GNU Radio pida exactamente
-        # un bloque completo en la primera (y única) llamada a work()
-        self.set_output_multiple(self.msglen)
-
-        logger.info(
-            "Trama lista: %d batches, %d muestras totales.", nbatch, self.msglen
-        )
-
-    # ------------------------------------------------------------------
-    # Interfaz GNU Radio
-    # ------------------------------------------------------------------
-    def work(self, input_items, output_items):
-        if self.state == 0:
-            output_items[0][: self.msglen] = np.array(self.pocsagmsg, dtype=np.int8)
-            self.state = 1
-            return self.msglen
-        return -1  # EOS → GNU Radio detiene el grafo
 
     # ------------------------------------------------------------------
     # Construcción de la trama POCSAG
@@ -196,7 +155,7 @@ class PocsagSender(gr.sync_block):
     def _encode_alpha(text: str) -> str:
         """Codifica texto alfanumérico como bits POCSAG (LSB primero por carácter, 7 bits)."""
         chars = [ord(c) % 128 for c in text] + [0x04]  # EOT al final
-        return "".join(BitArray(uint=c, length=7).bin[::-1] for c in chars)
+        return "".join(format(c, "07b")[::-1] for c in chars)
 
     @staticmethod
     def _encode_numeric(text: str) -> str:

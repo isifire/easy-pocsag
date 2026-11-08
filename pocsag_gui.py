@@ -19,6 +19,7 @@ Características:
 from __future__ import annotations
 
 import json
+from portable_runtime import tool_path, sender_command, subprocess_options
 import os
 import re
 import subprocess
@@ -52,18 +53,18 @@ try:
 except ImportError:
     HAS_CONFIG = False
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 SCRIPT_DIR = Path(__file__).parent.resolve()
 
 # ---------------------------------------------------------------------------
 # Paleta de colores — tema oscuro SDR
 # ---------------------------------------------------------------------------
 COLORS = {
-    "bg":           "#0d1117",   # fondo principal
+    "bg":           "#101722",   # fondo principal
     "bg_panel":     "#161b22",   # paneles / grupos
     "bg_input":     "#1c2128",   # campos de entrada
     "bg_console":   "#0a0e14",   # consola
-    "accent":       "#00d4aa",   # color de acento (verde SDR)
+    "accent":       "#58e0c0",   # color de acento (verde SDR)
     "accent_dim":   "#007a62",   # acento apagado
     "accent2":      "#388bfd",   # acento secundario (azul)
     "danger":       "#f85149",   # rojo de error
@@ -374,6 +375,7 @@ class TxWorker(QThread):
                 stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,
+                **subprocess_options(),
             )
             for line in self._process.stdout:
                 self.signals.line_stdout.emit(line.rstrip())
@@ -413,7 +415,7 @@ class HackRFIndicator(QLabel):
     def _check(self) -> None:
         try:
             result = subprocess.run(
-                ["hackrf_info"],
+                [tool_path("hackrf_info")],
                 capture_output=True,
                 timeout=3,
             )
@@ -546,6 +548,7 @@ class TransmitTab(QWidget):
 
         # ── Parámetros principales ──────────────────────────────────────
         params_grp = QGroupBox("Parámetros POCSAG")
+        params_grp.setMinimumHeight(210)
         pg = QGridLayout(params_grp)
         pg.setSpacing(8)
         pg.setColumnStretch(1, 1)
@@ -594,6 +597,7 @@ class TransmitTab(QWidget):
 
         # ── Mensaje ─────────────────────────────────────────────────────
         msg_grp = QGroupBox("Mensaje")
+        msg_grp.setMinimumHeight(110)
         mg = QVBoxLayout(msg_grp)
 
         msg_row = QHBoxLayout()
@@ -613,6 +617,7 @@ class TransmitTab(QWidget):
 
         # ── Repetición ──────────────────────────────────────────────────
         rep_grp = QGroupBox("Repetición")
+        rep_grp.setMinimumHeight(110)
         rg = QHBoxLayout(rep_grp)
 
         self.repeat_check = QCheckBox("Repetir envío")
@@ -643,7 +648,7 @@ class TransmitTab(QWidget):
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
 
-        self.btn_send = QPushButton("📡  TRANSMITIR")
+        self.btn_send = QPushButton("TRANSMITIR")
         self.btn_send.setObjectName("btn_send")
         self.btn_send.setMinimumHeight(46)
         self.btn_send.clicked.connect(self.start_transmission)
@@ -749,9 +754,7 @@ class TransmitTab(QWidget):
         if c is None:
             return
 
-        script = str(SCRIPT_DIR / "pocsag_sender.py")
-        cmd = [
-            sys.executable, script,
+        cmd = sender_command() + [
             "--RIC",           c["ric"],
             "--SubRIC",        c["subric"],
             "--pagerfreq",     str(c["freq_hz"]),
@@ -761,6 +764,8 @@ class TransmitTab(QWidget):
             "--repeat-delay",  str(c["delay"]),
             "--verbose",
         ]
+        gains = self._rf_gains()
+        cmd += ["--tx-gain", str(gains["tx_gain"]), "--if-gain", str(gains["if_gain"])]
         if c["mode"] != "tone":
             cmd += ["--Text", c["text"]]
 
@@ -769,7 +774,7 @@ class TransmitTab(QWidget):
             self.console.log_info(f"Mensaje: '{c['text']}'")
 
         self.btn_send.setEnabled(False)
-        self.btn_send.setText("📡  TRANSMITIENDO…")
+        self.btn_send.setText("TRANSMITIENDO…")
         self.btn_cancel.setEnabled(True)
         self.progress.setVisible(True)
 
@@ -801,7 +806,7 @@ class TransmitTab(QWidget):
             self.console.log_error(f"Transmisión finalizada con error (código {returncode}).")
 
         self.btn_send.setEnabled(True)
-        self.btn_send.setText("📡  TRANSMITIR")
+        self.btn_send.setText("TRANSMITIR")
         self.btn_cancel.setEnabled(False)
         self.progress.setVisible(False)
         self.transmission_finished.emit(success)
@@ -835,7 +840,7 @@ class RFConfigTab(QWidget):
         gg.addWidget(self._hint("Recomendado: 0 dB para corto alcance"), 0, 2)
 
         # IF gain slider
-        gg.addWidget(QLabel("IF Gain:"), 1, 0)
+        gg.addWidget(QLabel("TX VGA:"), 1, 0)
         if_row = QHBoxLayout()
         self.if_gain_slider = QSlider(Qt.Orientation.Horizontal)
         self.if_gain_slider.setRange(0, 5)       # 0..5 × 8 = 0..40 dB
@@ -850,10 +855,11 @@ class RFConfigTab(QWidget):
         gg.addWidget(self._hint("Rango: 0–40 dB (múltiplos de 8)"), 1, 2)
 
         # BB gain slider
-        gg.addWidget(QLabel("BB Gain:"), 2, 0)
+        gg.addWidget(QLabel("BB (solo RX):"), 2, 0)
         bb_row = QHBoxLayout()
         self.bb_gain_slider = QSlider(Qt.Orientation.Horizontal)
         self.bb_gain_slider.setRange(0, 31)      # 0..31 × 2 = 0..62 dB
+        self.bb_gain_slider.setEnabled(False)
         self.bb_gain_slider.setValue(10)         # 20 dB por defecto
         self.bb_gain_slider.setTickInterval(1)
         self.bb_gain_slider.valueChanged.connect(lambda v: self.bb_gain_lbl.setText(f"{v*2} dB"))
@@ -862,7 +868,7 @@ class RFConfigTab(QWidget):
         self.bb_gain_lbl.setFixedWidth(50)
         bb_row.addWidget(self.bb_gain_lbl)
         gg.addLayout(bb_row, 2, 1)
-        gg.addWidget(self._hint("Rango: 0–62 dB (múltiplos de 2)"), 2, 2)
+        gg.addWidget(self._hint("No se utiliza en transmisión"), 2, 2)
 
         root.addWidget(gain_grp)
 
@@ -935,7 +941,7 @@ class HistoryTab(QWidget):
         top_row = QHBoxLayout()
         top_row.addWidget(QLabel("Últimos mensajes transmitidos:"))
         top_row.addStretch()
-        self.btn_clear = QPushButton("🗑  Borrar historial")
+        self.btn_clear = QPushButton("Borrar historial")
         self.btn_clear.clicked.connect(self.clear_history)
         top_row.addWidget(self.btn_clear)
         root.addLayout(top_row)
@@ -1007,7 +1013,7 @@ class ProfilesTab(QWidget):
         root.addWidget(self.list_widget)
 
         btn_row = QHBoxLayout()
-        self.btn_delete = QPushButton("🗑  Eliminar")
+        self.btn_delete = QPushButton("Eliminar")
         self.btn_delete.clicked.connect(self._on_delete)
         btn_row.addWidget(self.btn_delete)
         btn_row.addStretch()
@@ -1057,7 +1063,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"POCSAG Sender  v{VERSION}  —  HackRF One")
-        self.setMinimumSize(820, 700)
+        self.setWindowIcon(QIcon(str(SCRIPT_DIR / "assets" / "icon.png")))
+        self.setMinimumSize(940, 700)
         self._setup_ui()
         self._load_saved_state()
 
@@ -1070,20 +1077,25 @@ class MainWindow(QMainWindow):
 
         # ── Header ──────────────────────────────────────────────────────
         header = QWidget()
-        header.setFixedHeight(64)
+        header.setObjectName("app_header")
+        header.setFixedHeight(86)
         header.setStyleSheet(
-            f"background: qlineargradient(x1:0, y1:0, x2:1, y2:0, "
+            f"QWidget#app_header {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:0, "
             f"stop:0 #0d1117, stop:1 #161b22); "
-            f"border-bottom: 1px solid {COLORS['border']};"
+            f"border-bottom: 1px solid {COLORS['border']}; }}"
         )
         hrow = QHBoxLayout(header)
         hrow.setContentsMargins(18, 0, 18, 0)
 
         title_col = QVBoxLayout()
         title_col.setSpacing(0)
-        t = QLabel("📡 POCSAG Sender")
+        logo = QLabel()
+        logo.setPixmap(QIcon(str(SCRIPT_DIR / "assets" / "icon.png")).pixmap(48, 48))
+        logo.setFixedSize(56, 56)
+        hrow.addWidget(logo)
+        t = QLabel("POCSAG Sender")
         t.setObjectName("label_header")
-        sub = QLabel(f"HackRF One  ·  GNU Radio  ·  v{VERSION}")
+        sub = QLabel(f"Centro de transmisión · HackRF One · v{VERSION}")
         sub.setObjectName("label_subheader")
         title_col.addWidget(t)
         title_col.addWidget(sub)
@@ -1104,7 +1116,7 @@ class MainWindow(QMainWindow):
         # Panel izquierdo: tabs
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(12, 12, 6, 12)
+        left_layout.setContentsMargins(20, 20, 12, 20)
         left_layout.setSpacing(8)
 
         self.tabs = QTabWidget()
@@ -1117,17 +1129,20 @@ class MainWindow(QMainWindow):
         self.history_tab  = HistoryTab()
         self.profiles_tab = ProfilesTab()
 
-        self.tabs.addTab(self.tx_tab,       "📡  Transmitir")
-        self.tabs.addTab(self.rf_tab,       "⚙️  Config RF")
-        self.tabs.addTab(self.history_tab,  "📋  Historial")
-        self.tabs.addTab(self.profiles_tab, "⭐  Perfiles")
+        for widget, label in ((self.tx_tab, "Transmitir"), (self.rf_tab, "Radio / RF"),
+                              (self.history_tab, "Historial"), (self.profiles_tab, "Perfiles")):
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setWidget(widget)
+            self.tabs.addTab(scroll, label)
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
         left_layout.addWidget(self.tabs)
 
         # Botones de perfil debajo de las tabs
         profile_row = QHBoxLayout()
-        self.btn_save_profile = QPushButton("⭐  Guardar como perfil")
+        self.btn_save_profile = QPushButton("Guardar perfil")
         self.btn_save_profile.setObjectName("btn_profile_save")
         self.btn_save_profile.clicked.connect(self._save_profile)
         profile_row.addWidget(self.btn_save_profile)
@@ -1145,11 +1160,11 @@ class MainWindow(QMainWindow):
         console_header = QHBoxLayout()
         console_header.addWidget(QLabel("Consola de salida"))
         console_header.addStretch()
-        btn_clear_console = QPushButton("🗑  Limpiar")
+        btn_clear_console = QPushButton("Limpiar")
         btn_clear_console.setFixedHeight(26)
         btn_clear_console.clicked.connect(self.console.clear)
         console_header.addWidget(btn_clear_console)
-        btn_export = QPushButton("💾  Exportar")
+        btn_export = QPushButton("Exportar")
         btn_export.setFixedHeight(26)
         btn_export.clicked.connect(self.console.export_to_file)
         console_header.addWidget(btn_export)
@@ -1174,6 +1189,7 @@ class MainWindow(QMainWindow):
         self.profiles_tab.load_into_transmit.connect(self._load_config_into_tx)
 
         # Conectar selección de frecuencia preset → TransmitTab
+        self.tx_tab._rf_gains = self.rf_tab.get_gains
         self.rf_tab._freq_callback = lambda freq: self.tx_tab.freq_input.setValue(freq)
 
     # ------------------------------------------------------------------
@@ -1317,7 +1333,16 @@ class MainWindow(QMainWindow):
 def main() -> None:
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    app.setStyleSheet(STYLESHEET)
+    app.setStyleSheet(STYLESHEET + """
+    QTabWidget::pane { border: 1px solid #303e50; border-radius: 8px; padding: 10px; }
+    QTabBar::tab { padding: 11px 15px; margin-right: 4px; }
+    QTabBar::tab:selected { color: #58e0c0; border-bottom: 2px solid #58e0c0; }
+    QGroupBox { padding: 18px 14px 14px; margin-top: 20px; }
+    QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox { min-height: 24px; }
+    QLabel#label_header { font-size: 21pt; font-weight: 700; }
+    QLabel#label_subheader { color: #a2b2c5; padding-top: 4px; }
+    """)
+    app.setWindowIcon(QIcon(str(SCRIPT_DIR / "assets" / "icon.png")))
 
     # Paleta base oscura para los componentes nativos
     palette = QPalette()
