@@ -80,11 +80,17 @@ COLORS = {
 
 STYLESHEET = f"""
 /* ── Ventana principal ─────────────────────────────────────────────── */
-QMainWindow, QWidget {{
+QMainWindow {{
     background-color: {COLORS['bg']};
+}}
+QWidget {{
     color: {COLORS['text']};
     font-family: 'Segoe UI', 'Ubuntu', sans-serif;
     font-size: 10pt;
+}}
+
+QLabel, QCheckBox {{
+    background: transparent;
 }}
 
 /* ── Grupos ────────────────────────────────────────────────────────── */
@@ -104,7 +110,7 @@ QGroupBox::title {{
     left: 12px;
     top: -1px;
     padding: 0 6px;
-    background-color: {COLORS['bg_panel']};
+    background-color: transparent;
     color: {COLORS['accent']};
     text-transform: uppercase;
 }}
