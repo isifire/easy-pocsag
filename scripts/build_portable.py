@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory() as temporary:
     source = Path(temporary)
     for path in list(ROOT.glob("*.py")) + [ROOT / name for name in ("README.md", "PORTABLE.md", "LICENSE", "requirements.txt")]:
         shutil.copy2(path, source / path.name)
-    for name in ("web_ui", "assets", "scripts", ".github"):
+    for name in ("web_ui", "assets", "images", "scripts", ".github"):
         shutil.copytree(ROOT / name, source / name, ignore=shutil.ignore_patterns("__pycache__"))
     shutil.make_archive(str(folder / "source"), "zip", source)
 licenses = folder / "licenses"

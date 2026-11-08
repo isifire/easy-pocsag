@@ -1,6 +1,6 @@
 # POCSAG Studio
 
-**[Descargar la versión portable](https://github.com/isifire/gr-pocsag/releases)**
+**[Descargar la versión portable](https://github.com/isifire/easy-pocsag/releases)**
 
 Interfaz web local para enviar mensajes POCSAG con un **HackRF One**.
 Motor Python/NumPy independiente de GNU Radio y OsmoSDR.
@@ -82,6 +82,10 @@ python -m unittest -v test_native_tx test_web_app
 - `config.py`: configuración, perfiles e historial.
 
 La polaridad del motor independiente se contrastó con la señal original: bit 1 con desviación negativa.
+
+## Ejemplo de recepción
+
+<img src="images/isi.jpg" alt="Mensaje recibido en un busca POCSAG" width="300">
 
 ## Créditos
 
