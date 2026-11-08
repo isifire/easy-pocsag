@@ -60,7 +60,7 @@ def sanitize_text(text: str, mode: str) -> str:
     - En modo numérico, filtra caracteres no numéricos.
     """
     # Eliminar caracteres de control
-    cleaned = "".join(c for c in text if ord(c) >= 0x20)
+    cleaned = "".join(" " if c in "\n\r\t" else c for c in text if ord(c) >= 0x20 or c in "\n\r\t")
     cleaned = cleaned.replace("\n", " ").replace("\r", "").replace("\x04", "")
     cleaned = cleaned.strip()
 

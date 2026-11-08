@@ -22,10 +22,10 @@ jobs:
         with:
           environment-name: portable
           create-args: >-
-            python=3.12 numpy pyqt6 pyinstaller hackrf -c conda-forge
+            python=3.12 numpy pyinstaller hackrf -c conda-forge
           init-shell: bash
           cache-environment: true
-      - run: QT_QPA_PLATFORM=offscreen python -m unittest -v test_native_tx test_gui
+      - run: python -m unittest -v test_native_tx test_web_app
       - run: python scripts/build_portable.py
       - name: Check frozen CLI
         run: |
@@ -34,7 +34,7 @@ jobs:
           else
             dist/$(python -c "import platform; print(platform.system().lower())")/POCSAG-Sender/_internal/worker/POCSAG-CLI/POCSAG-CLI --help
           fi
-      - name: Check bundled tools and Qt
+      - name: Check bundled HackRF tools
         env:
           QT_QPA_PLATFORM: offscreen
         run: |

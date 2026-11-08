@@ -1,23 +1,44 @@
-# POCSAG Sender portable
+# POCSAG Studio · Portable web local
 
-Extrae la carpeta completa antes de abrir POCSAG-Sender. No muevas el ejecutable separado de _internal.
-Incluye Python, NumPy, PyQt6 y las herramientas y bibliotecas HackRF. No requiere GNU Radio ni WSL.
+## Abrir
 
-Windows: abre únicamente POCSAG-Sender.exe (icono de busca verde). No abre consola; no hay VBS. El dispositivo necesita un controlador USB compatible con libusb/WinUSB.
-Linux: ejecuta ./POCSAG-Sender. Se requieren una sesiÃ³n grÃ¡fica y permisos USB/udev para el HackRF.
-macOS: ejecuta POCSAG-Sender en una sesiÃ³n grÃ¡fica. Los paquetes sin firma pueden requerir autorizaciÃ³n del sistema.
-La compatibilidad depende de la arquitectura y de la versiÃ³n mÃ­nima del SO usada para compilar.
+Extrae la carpeta completa y abre **POCSAG-Sender.exe** en Windows.
+En Linux/macOS ejecuta **POCSAG-Sender**. El programa abre una pestaña en tu navegador.
+Conserva `_internal` junto al ejecutable; contiene Python, NumPy, la interfaz web y las herramientas HackRF.
+No requiere instalar Python, Qt, GNU Radio ni OsmoSDR.
+Se necesita un navegador moderno y el controlador o los permisos USB correspondientes al sistema.
 
-CLI: _internal/worker/POCSAG-CLI/POCSAG-CLI --help (añade .exe en Windows)
-Los datos se guardan en ~/.pocsag_sender y sobreviven a las actualizaciones del programa.
+El servidor escucha únicamente en 127.0.0.1. No sube tus mensajes a ningún servicio.
+Puedes cerrar una pestaña y volver a abrir la aplicación para recuperar la interfaz.
+Usa **Cerrar aplicación** en la cabecera para detener el servidor local.
+
+## Hardware
+
+Windows: controlador compatible con libusb/WinUSB para el HackRF.
+Linux: permisos USB/udev. macOS: acceso al dispositivo y autorización de apertura si el paquete no está firmado.
+La compatibilidad depende de la arquitectura y de la versión mínima del SO de compilación.
+
+## Datos
+
+La configuración, los perfiles y los últimos 50 intentos se guardan en ~/.pocsag_sender.
+«Transmisión finalizada» confirma la entrega al transmisor; no confirma la recepción por el busca.
+
+## CLI
+
+_internal/worker/POCSAG-CLI/POCSAG-CLI --help (añade .exe en Windows).
 
 ## Compilar
-Instala Python 3.12, numpy, PyQt6, pyinstaller y hackrf (las herramientas deben estar en PATH).
-Ejecuta python scripts/build_portable.py en el sistema destino.
-Las compilaciones automÃ¡ticas de Windows, Linux y macOS estÃ¡n en .github/workflows/portable.yml.
 
-## Estado
-RecepciÃ³n fÃ­sica validada en Linux/WSL y en el portable nativo de Windows x64, alfanumÃ©rico a 2400 bps.
-Cada binario debe probarse en su SO con un HackRF; compilar no demuestra recepciÃ³n fÃ­sica.
-Antes de redistribuir, incluye las licencias y avisos de Python, NumPy, Qt/PyQt, HackRF/libusb y el cÃ³digo del proyecto.
-PyQt6 y HackRF tienen obligaciones de licencia que tambiÃ©n aplican a paquetes portables.
+Python 3.12, numpy, pyinstaller y hackrf en PATH.
+Ejecuta python scripts/build_portable.py en el sistema destino.
+GitHub Actions genera Windows x64, Linux x64 y macOS Intel/Apple Silicon.
+Una etiqueta v* prepara una Release en borrador; también se puede ejecutar manualmente.
+
+## Validación
+
+Recepción física confirmada en el portable web de Windows: modo alfanumérico a 2400 bps.
+El motor también se validó en Linux/WSL. macOS, otros modos y bitrates requieren validación física.
+
+## Distribución
+
+Revisa e incluye las licencias y avisos de Python, NumPy, HackRF, libusb y el código del proyecto antes de redistribuir.

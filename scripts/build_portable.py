@@ -7,12 +7,12 @@ import subprocess
 import sys
 ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
-subprocess.run([sys.executable, "scripts/make_icon.py"], check=True)
 dist = ROOT / "dist" / platform.system().lower()
 common = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir",
           "--distpath", str(dist), "--workpath", str(ROOT / "build" / platform.system().lower()),
-          "--exclude-module", "gnuradio", "--exclude-module", "osmosdr", "--exclude-module", "PyQt5",
-          "--add-data", f"{ROOT / 'assets'}{os.pathsep}assets"]
+          "--exclude-module", "gnuradio", "--exclude-module", "osmosdr", "--exclude-module", "PyQt5", "--exclude-module", "PyQt6",
+          "--add-data", f"{ROOT / 'assets'}{os.pathsep}assets",
+          "--add-data", f"{ROOT / 'web_ui'}{os.pathsep}web_ui"]
 for name in ("hackrf_transfer", "hackrf_info"):
     tool = shutil.which(name)
     if not tool:
