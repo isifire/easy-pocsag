@@ -31,7 +31,7 @@ from typing import Optional
 
 from PyQt6.QtCore import (
     QEasingCurve, QPropertyAnimation, QRect, QSize, Qt,
-    QThread, QTimer, pyqtSignal, QObject,
+    QThread, QTimer, QProcess, pyqtSignal, QObject,
 )
 from PyQt6.QtGui import (
     QColor, QFont, QFontDatabase, QIcon, QPalette,
@@ -370,19 +370,11 @@ class TxWorker(QThread):
     def run(self) -> None:
         try:
             self._process = subprocess.Popen(
-                self.cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,
-                **subprocess_options(),
+                self.cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, errors="replace", bufsize=1, **subprocess_options(),
             )
             for line in self._process.stdout:
-                self.signals.line_stdout.emit(line.rstrip())
-            stderr_out = self._process.stderr.read()
-            if stderr_out:
-                for line in stderr_out.splitlines():
-                    self.signals.line_stderr.emit(line)
+                self.signals.line_stderr.emit(line.rstrip())
             self._process.wait()
             self.signals.finished.emit(self._process.returncode)
         except FileNotFoundError as e:
@@ -407,22 +399,33 @@ class HackRFIndicator(QLabel):
         super().__init__(parent)
         self.setObjectName("hackrf_status")
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setFixedHeight(30)
+        self.setText("Comprobando HackRF…")
+        self._probe = QProcess(self)
+        self._probe.finished.connect(self._probe_finished)
+        self._probe.errorOccurred.connect(lambda _: self._show_connection(False))
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._check)
-        self._timer.start(5000)   # comprobar cada 5 segundos
-        self._check()
+        self._timer.start(5000)
+        QTimer.singleShot(0, self._check)
 
     def _check(self) -> None:
+        if self._probe.state() != QProcess.ProcessState.NotRunning:
+            return
         try:
-            result = subprocess.run(
-                [tool_path("hackrf_info")],
-                capture_output=True,
-                timeout=3,
-            )
-            connected = result.returncode == 0 and b"Serial number" in result.stdout
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            connected = False
+            self._probe.start(tool_path("hackrf_info"), [])
+            QTimer.singleShot(2500, self._timeout)
+        except FileNotFoundError:
+            self._show_connection(False)
 
+    def _timeout(self):
+        if self._probe.state() != QProcess.ProcessState.NotRunning:
+            self._probe.kill()
+
+    def _probe_finished(self, code, status):
+        self._show_connection(code == 0 and b"Serial number" in bytes(self._probe.readAllStandardOutput()))
+
+    def _show_connection(self, connected):
         if connected:
             self.setText("● HackRF conectado")
             self.setStyleSheet(
@@ -548,7 +551,7 @@ class TransmitTab(QWidget):
 
         # ── Parámetros principales ──────────────────────────────────────
         params_grp = QGroupBox("Parámetros POCSAG")
-        params_grp.setMinimumHeight(210)
+        params_grp.setMinimumHeight(185)
         pg = QGridLayout(params_grp)
         pg.setSpacing(8)
         pg.setColumnStretch(1, 1)
@@ -597,7 +600,7 @@ class TransmitTab(QWidget):
 
         # ── Mensaje ─────────────────────────────────────────────────────
         msg_grp = QGroupBox("Mensaje")
-        msg_grp.setMinimumHeight(110)
+        msg_grp.setMinimumHeight(100)
         mg = QVBoxLayout(msg_grp)
 
         msg_row = QHBoxLayout()
@@ -617,7 +620,7 @@ class TransmitTab(QWidget):
 
         # ── Repetición ──────────────────────────────────────────────────
         rep_grp = QGroupBox("Repetición")
-        rep_grp.setMinimumHeight(110)
+        rep_grp.setMinimumHeight(100)
         rg = QHBoxLayout(rep_grp)
 
         self.repeat_check = QCheckBox("Repetir envío")
@@ -1064,7 +1067,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle(f"POCSAG Sender  v{VERSION}  —  HackRF One")
         self.setWindowIcon(QIcon(str(SCRIPT_DIR / "assets" / "icon.png")))
-        self.setMinimumSize(940, 700)
+        self.setMinimumSize(820, 680)
         self._setup_ui()
         self._load_saved_state()
 
@@ -1109,7 +1112,7 @@ class MainWindow(QMainWindow):
         root.addWidget(header)
 
         # ── Splitter: izquierda (tabs) + derecha (consola) ───────────────
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter = QSplitter(Qt.Orientation.Vertical)
         splitter.setHandleWidth(1)
         splitter.setStyleSheet(f"QSplitter::handle {{ background: {COLORS['border']}; }}")
 
@@ -1138,7 +1141,11 @@ class MainWindow(QMainWindow):
             self.tabs.addTab(scroll, label)
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
-        left_layout.addWidget(self.tabs)
+        left_layout.addWidget(self.tabs, stretch=1)
+        actions = QHBoxLayout()
+        actions.addWidget(self.tx_tab.btn_send, stretch=1)
+        actions.addWidget(self.tx_tab.btn_cancel)
+        left_layout.addLayout(actions)
 
         # Botones de perfil debajo de las tabs
         profile_row = QHBoxLayout()
@@ -1147,6 +1154,9 @@ class MainWindow(QMainWindow):
         self.btn_save_profile.clicked.connect(self._save_profile)
         profile_row.addWidget(self.btn_save_profile)
         profile_row.addStretch()
+        toggle_log = QPushButton("Mostrar registro")
+        toggle_log.setCheckable(True)
+        profile_row.addWidget(toggle_log)
         left_layout.addLayout(profile_row)
 
         splitter.addWidget(left_panel)
@@ -1161,11 +1171,11 @@ class MainWindow(QMainWindow):
         console_header.addWidget(QLabel("Consola de salida"))
         console_header.addStretch()
         btn_clear_console = QPushButton("Limpiar")
-        btn_clear_console.setFixedHeight(26)
+        btn_clear_console.setMinimumHeight(32)
         btn_clear_console.clicked.connect(self.console.clear)
         console_header.addWidget(btn_clear_console)
         btn_export = QPushButton("Exportar")
-        btn_export.setFixedHeight(26)
+        btn_export.setMinimumHeight(32)
         btn_export.clicked.connect(self.console.export_to_file)
         console_header.addWidget(btn_export)
         right_layout.addLayout(console_header)
@@ -1173,7 +1183,12 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.console, stretch=1)
 
         splitter.addWidget(right_panel)
-        splitter.setSizes([420, 380])
+        right_panel.setMinimumHeight(130)
+        right_panel.setMaximumHeight(240)
+        right_panel.hide()
+        toggle_log.toggled.connect(right_panel.setVisible)
+        toggle_log.toggled.connect(lambda visible: toggle_log.setText("Ocultar registro" if visible else "Mostrar registro"))
+        splitter.setSizes([500, 160])
 
         root.addWidget(splitter, stretch=1)
 
@@ -1196,18 +1211,21 @@ class MainWindow(QMainWindow):
     # Tab change
     # ------------------------------------------------------------------
     def _on_tab_changed(self, idx: int) -> None:
-        if self.tabs.widget(idx) is self.history_tab:
+        if idx == 2:
             self.history_tab.refresh()
-        elif self.tabs.widget(idx) is self.profiles_tab:
+        elif idx == 3:
             self.profiles_tab.refresh()
 
     # ------------------------------------------------------------------
     # Transmisión
     # ------------------------------------------------------------------
     def _on_tx_started(self) -> None:
+        self.hackrf_indicator._timer.stop()
+        self.hackrf_indicator._probe.kill()
         self.status_bar.showMessage("📡 Transmitiendo…")
 
     def _on_tx_finished(self, success: bool) -> None:
+        self.hackrf_indicator._timer.start(5000)
         self.status_bar.showMessage(
             "✓ Transmisión completada." if success else "✗ Error en la transmisión."
         )
@@ -1323,6 +1341,15 @@ class MainWindow(QMainWindow):
             pass
 
     def closeEvent(self, event) -> None:
+        self.hackrf_indicator._timer.stop()
+        self.hackrf_indicator._probe.kill()
+        self.hackrf_indicator._probe.waitForFinished(1000)
+        worker = self.tx_tab._worker
+        if worker and worker.isRunning():
+            worker.cancel()
+            if not worker.wait(3000):
+                event.ignore()
+                return
         self._save_state()
         super().closeEvent(event)
 

@@ -25,7 +25,7 @@ jobs:
             python=3.12 numpy pyqt6 pyinstaller hackrf -c conda-forge
           init-shell: bash
           cache-environment: true
-      - run: python -m unittest -v test_native_tx
+      - run: QT_QPA_PLATFORM=offscreen python -m unittest -v test_native_tx test_gui
       - run: python scripts/build_portable.py
       - name: Check frozen CLI
         run: |
