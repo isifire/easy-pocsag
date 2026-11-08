@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 import threading
 import unittest
+from unittest.mock import patch
+import subprocess
 import urllib.request
 import urllib.error
 from dataclasses import asdict
@@ -10,6 +12,18 @@ from web_app import Controller, Handler, TOKEN, ThreadingHTTPServer, transmissio
 from pocsag_sender import sanitize_text
 
 class WebTests(unittest.TestCase):
+    def test_portable_check_allows_absent_hardware_not_loader_failures(self):
+        from cli_entry import self_test
+        def healthy(args, **kwargs):
+            if args[0] == "hackrf_info":
+                return subprocess.CompletedProcess(args, 1, b"libhackrf version: test\nNo HackRF boards found.\n", b"")
+            return subprocess.CompletedProcess(args, 0, b"Usage: hackrf_transfer", b"")
+        with patch("portable_runtime.tool_path", side_effect=lambda name: name), patch("subprocess.run", side_effect=healthy):
+            self.assertFalse(self_test()["hardware_detected"])
+        with patch("portable_runtime.tool_path", side_effect=lambda name: name), patch("subprocess.run", return_value=subprocess.CompletedProcess([],1,b"",b"Library not loaded")):
+            with self.assertRaises(RuntimeError):
+                self_test()
+
     def test_configuration_validation(self):
         data = asdict(config.TransmissionConfig(text="Prueba"))
         self.assertEqual(transmission_config(data).ric, 1107305)
