@@ -1,5 +1,7 @@
 # POCSAG Studio
 
+**[Descargar la versión portable](https://github.com/isifire/gr-pocsag/releases)**
+
 Interfaz web local para enviar mensajes POCSAG con un **HackRF One**.
 Motor Python/NumPy independiente de GNU Radio y OsmoSDR.
 
@@ -9,7 +11,7 @@ Extrae el ZIP de tu sistema y abre **POCSAG-Sender.exe** (Windows) o **POCSAG-Se
 La interfaz se abre en el navegador. No hace falta instalar Python ni Qt.
 Mantén la carpeta `_internal` junto al ejecutable.
 
-Necesitas el controlador USB del HackRF en Windows, o los permisos USB de tu sistema.
+Solo se necesita un navegador moderno y el acceso USB al HackRF. Si el dispositivo no se detecta, abre **Ayuda USB** dentro de la interfaz: incluye la descarga oficial de Zadig para Windows y las indicaciones para Linux/macOS. No se descargan ni ejecutan instaladores en segundo plano.
 Cierra el programa con **Cerrar aplicación** en la cabecera de la interfaz.
 
 ## Desde el código
@@ -60,8 +62,8 @@ Las herramientas `hackrf_info` y `hackrf_transfer` deben estar en PATH al compil
 Los paquetes incluyen Python, NumPy, archivos web y herramientas/bibliotecas HackRF.
 Cada sistema se compila en su propio entorno.
 
-**Build portable applications** genera paquetes al subir a main/master, manualmente o con etiquetas v*.
-Comprueba el motor, la API local y el auxiliar empaquetado. Una etiqueta v* crea una Release en borrador con los ZIP.
+**Build portable applications** comprueba el código al subir a main/master. Genera los paquetes al ejecutarse manualmente o con etiquetas v*.
+Comprueba el motor, la API local y el auxiliar empaquetado. Una etiqueta v* publica una Release con los ZIP; las etiquetas con guion se publican como versiones preliminares.
 Consulta [PORTABLE.md](PORTABLE.md) para instrucciones de uso y distribución.
 
 ## Pruebas sin transmisión
@@ -78,7 +80,6 @@ python -m unittest -v test_native_tx test_web_app
 - `native_tx.py`: I/Q int8, FSK de fase continua a 12 MS/s y ±4,5 kHz.
 - `pocsag_sender.py`: CLI y transmisión mediante hackrf_transfer.
 - `config.py`: configuración, perfiles e historial.
-- `pocsagsend.grc`: flujo original, conservado como referencia histórica.
 
 La polaridad del motor independiente se contrastó con la señal original: bit 1 con desviación negativa.
 

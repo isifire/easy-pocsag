@@ -14,6 +14,8 @@ Usa **Cerrar aplicación** en la cabecera para detener el servidor local.
 
 ## Hardware
 
+La opción **Ayuda USB** de la web contiene los enlaces e instrucciones.
+
 Windows: controlador compatible con libusb/WinUSB para el HackRF.
 Linux: permisos USB/udev. macOS: acceso al dispositivo y autorización de apertura si el paquete no está firmado.
 La compatibilidad depende de la arquitectura y de la versión mínima del SO de compilación.
@@ -32,7 +34,7 @@ _internal/worker/POCSAG-CLI/POCSAG-CLI --help (añade .exe en Windows).
 Python 3.12, numpy, pyinstaller y hackrf en PATH.
 Ejecuta python scripts/build_portable.py en el sistema destino.
 GitHub Actions genera Windows x64, Linux x64 y macOS Intel/Apple Silicon.
-Una etiqueta v* prepara una Release en borrador; también se puede ejecutar manualmente.
+Una etiqueta v* publica una Release; las etiquetas con guion son preliminares. También se puede compilar manualmente.
 
 ## Validación
 
